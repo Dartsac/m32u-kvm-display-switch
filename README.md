@@ -15,8 +15,11 @@ When the M32U switches to another input, the DisplayPort connection stays active
 
 1. The M32U's KVM moves the monitor's built-in USB hub between its two upstream ports. In this setup, **USB-C is paired with HDMI 1**.
 2. A USB-C cable connects the monitor's USB-C port to the Mac (through the dock). When the monitor switches to HDMI 1, the monitor's USB control device (Realtek `0x0BDA:0x1100`) appears on the Mac. When it switches back, the device disappears.
-3. `kvm-display-watcher` asks macOS to wake it when that USB device connects or disconnects. It sleeps the rest of the time, using 0% CPU and about 9 MB of memory.
-4. When it wakes up, it waits 1.5 s for USB activity to settle, then runs `toggle-mirror.sh mirror` or `toggle-mirror.sh extend`.
+3. `kvm-display-watcher` asks macOS to wake it when that USB device connects or disconnects, and when the MacBook's built-in screen turns on (lid opened, or the Mac wakes up). It sleeps the rest of the time, using 0% CPU and about 35 MB of memory.
+4. When it wakes up, it waits 1.5 s for activity to settle, then:
+   - USB device present (monitor on HDMI 1): runs `toggle-mirror.sh mirror`.
+   - USB device just disconnected (monitor back on the Mac): runs `toggle-mirror.sh extend`.
+   - Built-in screen turned on and USB device absent: runs `toggle-mirror.sh extend` only if the watcher made the current mirror. A mirror you turned on by hand is left alone.
 5. `toggle-mirror.sh` uses `displayplacer` to change the layout. Before it mirrors, it saves the current extended layout by exact mode number, then restores that layout later.
 
 ## Requirements
@@ -63,7 +66,11 @@ The watcher logs each switch to `~/Library/Logs/m32u-kvm-display-watcher.log`. T
 ~/bin/toggle-mirror.sh extend   # restore the saved extended layout
 ```
 
-To use a keyboard shortcut, create a shortcut in the Shortcuts app with a **Run Shell Script** action that runs `~/bin/toggle-mirror.sh`, then add a keyboard shortcut to it. The watcher only acts on KVM switches, so it does not undo a manual change.
+To use a keyboard shortcut, create a shortcut in the Shortcuts app with a **Run Shell Script** action that runs `~/bin/toggle-mirror.sh`, then add a keyboard shortcut to it. The watcher does not undo a manual change: it only restores the extended layout after a KVM switch away from HDMI 1, or when it made the current mirror itself.
+
+## Lid closed (clamshell mode)
+
+While the lid is closed, `toggle-mirror.sh` does nothing, because there is no MacBook screen to mirror to. When you open the lid, the watcher sets the layout to match the monitor: mirrored if the monitor is on HDMI 1, otherwise extended (if the watcher had mirrored it).
 
 ## Limits
 

@@ -16,15 +16,22 @@ if ! command -v displayplacer >/dev/null; then
   exit 1
 fi
 
+# With the lid closed (clamshell mode) there is no MacBook screen to mirror to
+if ioreg -r -k AppleClamshellState -d 4 | grep -q '"AppleClamshellState" = Yes'; then
+  echo "MacBook lid is closed; nothing to do"
+  exit 0
+fi
+
 list=$(displayplacer list)
 
-# One line per screen: <id> <builtin 1|0> <mode> <width> <origin> <degree>
+# One line per enabled screen: <id> <builtin 1|0> <mode> <width> <origin> <degree>
 screens=$(awk '
-  /^Persistent screen id:/ {id=$4; builtin=0}
+  /^Persistent screen id:/ {id=$4; builtin=0; enabled=1}
   /^Type:/ {builtin=($0 ~ /built in/)}
   /^Origin:/ {origin=$2}
   /^Rotation:/ {deg=$2}
-  /<-- current mode/ {m=$2; sub(":","",m); split($3,r,"[:x]"); print id, builtin, m, r[2], origin, deg}
+  /^Enabled:/ {enabled=($2 == "true")}
+  /<-- current mode/ && enabled {m=$2; sub(":","",m); split($3,r,"[:x]"); print id, builtin, m, r[2], origin, deg}
 ' <<<"$list")
 
 builtin=$(awk '$2==1 {print $1}' <<<"$screens")
@@ -35,7 +42,7 @@ if [[ -z "$external" ]]; then
   exit 0
 fi
 if [[ -z "$builtin" ]]; then
-  echo "MacBook screen is off (lid closed?); nothing to do"
+  echo "MacBook screen is off; nothing to do"
   exit 0
 fi
 if [[ $(wc -l <<<"$external") -gt 1 ]]; then
